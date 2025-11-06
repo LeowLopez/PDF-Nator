@@ -45,26 +45,26 @@ const App = () => {
 
   const generateThumbnail = async (arrayBuffer, pageIndex) => {
     if (!pdfJs) return null;
-    
+
     try {
       const uint8Array = new Uint8Array(arrayBuffer);
       const loadingTask = pdfJs.getDocument({ data: uint8Array });
       const pdf = await loadingTask.promise;
       const page = await pdf.getPage(pageIndex + 1);
-      
+
       const scale = 0.5;
       const viewport = page.getViewport({ scale });
-      
+
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       canvas.width = viewport.width;
       canvas.height = viewport.height;
-      
+
       await page.render({
         canvasContext: context,
         viewport: viewport
       }).promise;
-      
+
       return canvas.toDataURL();
     } catch (error) {
       console.error('Erro ao gerar thumbnail da página', pageIndex + 1, ':', error);
@@ -75,26 +75,30 @@ const App = () => {
   const handleFileSelect = async (e) => {
     const selectedFiles = Array.from(e.target.files);
     const pdfFiles = selectedFiles.filter(f => f.type === 'application/pdf');
-    
+
     if (!pdfJs) {
       alert('Aguarde, carregando biblioteca PDF...');
       return;
     }
-    
+
     setIsProcessing(true);
-    
+
     try {
       const filesWithPages = await Promise.all(
         pdfFiles.map(async (file) => {
-          const arrayBuffer = await file.arrayBuffer();
-          const pdfDoc = await PDFDocument.load(arrayBuffer);
+          const arrayBufferOriginal = await file.arrayBuffer();
+
+          // Cria uma cópia do ArrayBuffer para uso pelo pdf-lib
+          const arrayBufferForLib = arrayBufferOriginal.slice(0);
+          const pdfDoc = await PDFDocument.load(arrayBufferForLib);
           const pageCount = pdfDoc.getPageCount();
-          
+
           const pages = [];
-          
-          // Gerar thumbnail para cada página
+
+          // Gera thumbnails usando outra cópia para o pdf.js
           for (let i = 0; i < pageCount; i++) {
-            const thumbnail = await generateThumbnail(arrayBuffer, i);
+            const arrayBufferForPdfJs = arrayBufferOriginal.slice(0); // cópia nova
+            const thumbnail = await generateThumbnail(arrayBufferForPdfJs, i);
             pages.push({
               id: Math.random().toString(36).substr(2, 9),
               pageNum: i + 1,
@@ -102,17 +106,17 @@ const App = () => {
               thumbnail
             });
           }
-          
+
           return {
             id: Math.random().toString(36).substr(2, 9),
             file,
             name: file.name,
-            arrayBuffer,
+            arrayBuffer: arrayBufferOriginal, // mantém o original
             pages
           };
         })
       );
-      
+
       setFiles(prev => [...prev, ...filesWithPages]);
     } catch (error) {
       alert('Erro ao processar PDFs: ' + error.message);
@@ -120,14 +124,15 @@ const App = () => {
       setIsProcessing(false);
     }
   };
+  
 
   const rotatePageInFile = (fileId, pageId) => {
     setFiles(files.map(file => {
       if (file.id === fileId) {
         return {
           ...file,
-          pages: file.pages.map(page => 
-            page.id === pageId 
+          pages: file.pages.map(page =>
+            page.id === pageId
               ? { ...page, rotation: (page.rotation + 90) % 360 }
               : page
           )
@@ -172,12 +177,12 @@ const App = () => {
   const handleDragOver = (e, index) => {
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === index) return;
-    
+
     const newFiles = [...files];
     const draggedFile = newFiles[draggedIndex];
     newFiles.splice(draggedIndex, 1);
     newFiles.splice(index, 0, draggedFile);
-    
+
     setFiles(newFiles);
     setDraggedIndex(index);
   };
@@ -186,32 +191,32 @@ const App = () => {
 
   const processPDF = async () => {
     if (files.length === 0) return;
-    
+
     setIsProcessing(true);
-    
+
     try {
       const mergedPdf = await PDFDocument.create();
-      
+
       for (const file of files) {
         const pdfDoc = await PDFDocument.load(file.arrayBuffer);
-        
+
         for (let i = 0; i < file.pages.length; i++) {
           const pageData = file.pages[i];
           const [copiedPage] = await mergedPdf.copyPages(pdfDoc, [pageData.pageNum - 1]);
-          
+
           if (pageData.rotation !== 0) {
             copiedPage.setRotation(degrees(pageData.rotation));
           }
-          
+
           mergedPdf.addPage(copiedPage);
         }
       }
-      
+
       const pdfBytes = await mergedPdf.save();
       downloadPDF(pdfBytes, 'merged-document.pdf');
-      
+
       alert('PDF processado com sucesso!');
-      
+
     } catch (error) {
       alert('Erro ao processar PDF: ' + error.message);
     } finally {
@@ -229,14 +234,14 @@ const App = () => {
     URL.revokeObjectURL(url);
   };
 
-  const allPages = files.flatMap(file => 
+  const allPages = files.flatMap(file =>
     file.pages.map(page => ({ ...page, fileName: file.name, fileId: file.id }))
   );
 
   return (
     <div className="app-container">
       <Header isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
-      
+
       <main className="main-content">
         <div className="tabs">
           <button
@@ -260,7 +265,7 @@ const App = () => {
         {files.length > 0 && (
           <>
             <StatsBar files={files} />
-            
+
             <div className="files-container">
               {activeTab === 'files' ? (
                 files.map((file, index) => (
@@ -298,7 +303,7 @@ const App = () => {
                 <Download size={20} />
                 {isProcessing ? 'Processando...' : 'Baixar PDF Único'}
               </button>
-              
+
               <button
                 onClick={() => setFiles([])}
                 className="btn btn-secondary"
