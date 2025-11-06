@@ -6,6 +6,8 @@ import UploadArea from './components/UploadArea';
 import FileCard from './components/FileCard';
 import PageCard from './components/PageCard';
 import StatsBar from './components/StatsBar';
+import Notification from './components/Notification';
+
 import './styles/App.css';
 
 // Carregar PDF.js
@@ -32,6 +34,12 @@ const App = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pdfJs, setPdfJs] = useState(null);
+
+  const [notification, setNotification] = useState(null);
+
+  const showNotification = (type, message) => {
+    setNotification({ type, message });
+  };
 
   useEffect(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -77,7 +85,7 @@ const App = () => {
     const pdfFiles = selectedFiles.filter(f => f.type === 'application/pdf');
 
     if (!pdfJs) {
-      alert('Aguarde, carregando biblioteca PDF...');
+      showNotification('info', 'Aguarde, carregando biblioteca PDF...');
       return;
     }
 
@@ -119,12 +127,12 @@ const App = () => {
 
       setFiles(prev => [...prev, ...filesWithPages]);
     } catch (error) {
-      alert('Erro ao processar PDFs: ' + error.message);
+      showNotification('error', 'Erro ao processar PDFs: ' + error.message);
     } finally {
       setIsProcessing(false);
     }
   };
-  
+
 
   const rotatePageInFile = (fileId, pageId) => {
     setFiles(files.map(file => {
@@ -213,12 +221,25 @@ const App = () => {
       }
 
       const pdfBytes = await mergedPdf.save();
-      downloadPDF(pdfBytes, 'merged-document.pdf');
 
-      alert('PDF processado com sucesso!');
+      // === Gerar nome personalizado ===
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const timestamp =
+        now.getFullYear().toString() +
+        pad(now.getMonth() + 1) +
+        pad(now.getDate()) + '-' +
+        pad(now.getHours()) +
+        pad(now.getMinutes()) +
+        pad(now.getSeconds());
+      const filename = `${timestamp} by PDF-Nator.pdf`;
+
+      downloadPDF(pdfBytes, filename);
+
+      showNotification('success', 'PDF processado com sucesso!');
 
     } catch (error) {
-      alert('Erro ao processar PDF: ' + error.message);
+      showNotification('error', 'Erro ao processar PDF: ' + error.message);
     } finally {
       setIsProcessing(false);
     }
@@ -240,6 +261,15 @@ const App = () => {
 
   return (
     <div className="app-container">
+
+      {notification && (
+        <Notification
+          type={notification.type}
+          message={notification.message}
+          onClose={() => setNotification(null)}
+        />
+      )}
+      
       <Header isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
 
       <main className="main-content">

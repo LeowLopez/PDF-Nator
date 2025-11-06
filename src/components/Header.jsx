@@ -8,7 +8,7 @@ const Header = ({ isDarkMode, setIsDarkMode }) => (
         <div className="logo-icon">
           <FileUp size={26} color="white" />
         </div>
-        <h1 className="header-title">PDF Utilities Pro</h1>
+        <h1 className="header-title">PDF-Nator</h1>
       </div>
       
       <div className="header-actions">
