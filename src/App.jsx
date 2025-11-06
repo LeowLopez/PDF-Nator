@@ -8,25 +8,78 @@ import PageCard from './components/PageCard';
 import StatsBar from './components/StatsBar';
 import './styles/App.css';
 
+// Carregar PDF.js
+const loadPdfJs = () => {
+  return new Promise((resolve) => {
+    if (window.pdfjsLib) {
+      resolve(window.pdfjsLib);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      resolve(window.pdfjsLib);
+    };
+    document.head.appendChild(script);
+  });
+};
+
 const App = () => {
   const [files, setFiles] = useState([]);
   const [activeTab, setActiveTab] = useState('files');
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pdfJs, setPdfJs] = useState(null);
 
   useEffect(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setIsDarkMode(prefersDark);
+    loadPdfJs().then(lib => setPdfJs(lib));
   }, []);
 
   useEffect(() => {
     document.body.className = isDarkMode ? 'dark-theme' : '';
   }, [isDarkMode]);
 
+  const generateThumbnail = async (arrayBuffer, pageIndex) => {
+    if (!pdfJs) return null;
+    
+    try {
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const loadingTask = pdfJs.getDocument({ data: uint8Array });
+      const pdf = await loadingTask.promise;
+      const page = await pdf.getPage(pageIndex + 1);
+      
+      const scale = 0.5;
+      const viewport = page.getViewport({ scale });
+      
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+      
+      return canvas.toDataURL();
+    } catch (error) {
+      console.error('Erro ao gerar thumbnail da página', pageIndex + 1, ':', error);
+      return null;
+    }
+  };
+
   const handleFileSelect = async (e) => {
     const selectedFiles = Array.from(e.target.files);
     const pdfFiles = selectedFiles.filter(f => f.type === 'application/pdf');
+    
+    if (!pdfJs) {
+      alert('Aguarde, carregando biblioteca PDF...');
+      return;
+    }
     
     setIsProcessing(true);
     
@@ -38,12 +91,15 @@ const App = () => {
           const pageCount = pdfDoc.getPageCount();
           
           const pages = [];
+          
+          // Gerar thumbnail para cada página
           for (let i = 0; i < pageCount; i++) {
+            const thumbnail = await generateThumbnail(arrayBuffer, i);
             pages.push({
               id: Math.random().toString(36).substr(2, 9),
               pageNum: i + 1,
               rotation: 0,
-              thumbnail: null
+              thumbnail
             });
           }
           

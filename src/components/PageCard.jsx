@@ -1,35 +1,27 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { RotateCw, Trash2 } from 'lucide-react';
 
 const PageCard = ({ page, onRotate, onRemove }) => {
-  const canvasRef = useRef(null);
-  
-  useEffect(() => {
-    if (page.thumbnail && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate((page.rotation * Math.PI) / 180);
-        ctx.drawImage(img, -img.width / 2, -img.height / 2);
-        ctx.restore();
-      };
-      img.src = page.thumbnail;
-    }
-  }, [page.thumbnail, page.rotation]);
-  
   return (
     <div className="page-card">
-      <div className="page-preview">
-        {page.thumbnail ? (
-          <canvas ref={canvasRef} style={{ transform: `rotate(${page.rotation}deg)` }} />
-        ) : (
-          <div className="page-number">{page.pageNum}</div>
-        )}
+      <div className="page-preview-container">
+        <div 
+          className="page-preview"
+          style={{
+            transform: `rotate(${page.rotation}deg)`,
+            transition: 'transform 0.3s ease'
+          }}
+        >
+          {page.thumbnail ? (
+            <img 
+              src={page.thumbnail} 
+              alt={`Página ${page.pageNum}`}
+              className="page-thumbnail"
+            />
+          ) : (
+            <div className="page-number">{page.pageNum}</div>
+          )}
+        </div>
       </div>
       <div className="page-filename">{page.fileName}</div>
       

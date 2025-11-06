@@ -276,7 +276,8 @@ body {
 }
 
 .upload-area:hover:not(.disabled) .upload-icon svg {
-  color: white;
+  color: white !important;
+  stroke: white;
 }
 
 .upload-title {
@@ -333,6 +334,35 @@ body {
   flex: 1;
 }
 
+.file-thumbnail-wrapper {
+  position: relative;
+  width: 50px;
+  height: 66px;
+  flex-shrink: 0;
+}
+
+.file-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease;
+}
+
+.file-rotation-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: var(--color-borderfocus);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(66, 165, 245, 0.4);
+}
+
 .file-icon {
   width: 50px;
   height: 66px;
@@ -345,6 +375,7 @@ body {
   font-weight: 700;
   color: white;
   box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+  flex-shrink: 0;
 }
 
 .file-details {
@@ -361,6 +392,11 @@ body {
 .file-meta {
   font-size: 13px;
   color: var(--color-font4light);
+}
+
+.rotation-indicator {
+  color: var(--color-borderfocus);
+  font-weight: 600;
 }
 
 .file-actions {
@@ -411,7 +447,7 @@ body {
 
 .page-card {
   position: relative;
-  background: var(--color-bg4);
+  background: var(--color-bg3);
   border: 2px solid var(--color-borderdefault);
   border-radius: 12px;
   overflow: hidden;
@@ -425,25 +461,31 @@ body {
   box-shadow: 0 8px 24px var(--color-shadow);
 }
 
-.page-preview {
+.page-preview-container {
   aspect-ratio: 3/4;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  background: linear-gradient(135deg, var(--color-bg2), var(--color-bg4));
-  transition: transform 0.3s ease;
-  position: relative;
+  background: var(--color-bg4);
+  padding: 12px;
   overflow: hidden;
 }
 
-.page-preview canvas {
+.page-preview {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.page-thumbnail {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .page-number {
