@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/PDF-Nator/static/css/main.9f23588a.css",
+    "main.js": "/PDF-Nator/static/js/main.109ae7d5.js",
+    "static/js/226.a0a71624.chunk.js": "/PDF-Nator/static/js/226.a0a71624.chunk.js",
+    "index.html": "/PDF-Nator/index.html",
+    "main.9f23588a.css.map": "/PDF-Nator/static/css/main.9f23588a.css.map",
+    "main.109ae7d5.js.map": "/PDF-Nator/static/js/main.109ae7d5.js.map",
+    "226.a0a71624.chunk.js.map": "/PDF-Nator/static/js/226.a0a71624.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.9f23588a.css",
+    "static/js/main.109ae7d5.js"
+  ]
+}
