@@ -24,24 +24,36 @@ GlobalWorkerOptions.workerPort = pdfWorker;
 
 const App = () => {
   const [files, setFiles] = useState([]);
+  const [pageOrder, setPageOrder] = useState([]);
   const [activeTab, setActiveTab] = useState('files');
   const [draggedIndex, setDraggedIndex] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [themeLoaded, setThemeLoaded] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   const showNotification = (type, message) => {
     setNotification({ type, message });
   };
 
+
   useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDarkMode(prefersDark);
+    const storedTheme = localStorage.getItem('pdfnator-theme');
+    if (storedTheme) {
+      setIsDarkMode(storedTheme === 'dark');
+    } else {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setIsDarkMode(prefersDark);
+    }
+    setThemeLoaded(true);
   }, []);
 
   useEffect(() => {
+    if (!themeLoaded) return; // evita sobrescrever durante o carregamento inicial
     document.body.className = isDarkMode ? 'dark-theme' : '';
-  }, [isDarkMode]);
+    localStorage.setItem('pdfnator-theme', isDarkMode ? 'dark' : 'light');
+  }, [isDarkMode, themeLoaded]);
+
 
   // === Gerar thumbnails de páginas ===
   const generateThumbnail = async (arrayBuffer, pageIndex) => {
@@ -174,24 +186,72 @@ const App = () => {
   };
   const handleDragEnd = () => setDraggedIndex(null);
 
+  // === Reordenação global de páginas (mantém vínculo com documento) ===
+  const handlePageDrag = (e, draggedPage) => {
+    e.dataTransfer.setData('pageId', draggedPage.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handlePageDrop = (e, targetPage) => {
+    e.preventDefault();
+    const draggedPageId = e.dataTransfer.getData('pageId');
+    if (!draggedPageId) return;
+
+    setPageOrder(prev => {
+      // usa base atual (ou todas as páginas)
+      const current = prev.length
+        ? [...prev]
+        : files.flatMap(file =>
+          file.pages.map(page => ({
+            ...page,
+            fileName: file.name,
+            fileId: file.id,
+            totalPages: file.pages.length
+          }))
+        );
+
+      const draggedIndex = current.findIndex(p => p.id === draggedPageId);
+      const targetIndex = current.findIndex(p => p.id === targetPage.id);
+      if (draggedIndex === -1 || targetIndex === -1) return current;
+
+      const [moved] = current.splice(draggedIndex, 1);
+      current.splice(targetIndex, 0, moved);
+
+      return current;
+    });
+  };
+
+
+
+
   // === Mesclar e baixar PDF final ===
   const processPDF = async () => {
     if (files.length === 0) return;
     setIsProcessing(true);
+
     try {
       const mergedPdf = await PDFDocument.create();
 
-      for (const file of files) {
+      const pagesToUse = pageOrder.length
+        ? pageOrder
+        : files.flatMap(file =>
+          file.pages.map(page => ({
+            ...page,
+            fileId: file.id
+          }))
+        );
+
+      for (const pageData of pagesToUse) {
+        const file = files.find(f => f.id === pageData.fileId);
+        if (!file) continue;
         const pdfDoc = await PDFDocument.load(file.arrayBuffer);
-        for (let i = 0; i < file.pages.length; i++) {
-          const pageData = file.pages[i];
-          const [copiedPage] = await mergedPdf.copyPages(pdfDoc, [pageData.pageNum - 1]);
-          if (pageData.rotation !== 0) copiedPage.setRotation(degrees(pageData.rotation));
-          mergedPdf.addPage(copiedPage);
-        }
+        const [copiedPage] = await mergedPdf.copyPages(pdfDoc, [pageData.pageNum - 1]);
+        if (pageData.rotation !== 0) copiedPage.setRotation(degrees(pageData.rotation));
+        mergedPdf.addPage(copiedPage);
       }
 
       const pdfBytes = await mergedPdf.save({ useObjectStreams: true });
+
       const now = new Date();
       const pad = (n) => String(n).padStart(2, '0');
       const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
@@ -216,9 +276,17 @@ const App = () => {
     URL.revokeObjectURL(url);
   };
 
-  const allPages = files.flatMap(file =>
-    file.pages.map(page => ({ ...page, fileName: file.name, fileId: file.id }))
-  );
+  const allPages = pageOrder.length
+    ? pageOrder
+    : files.flatMap(file =>
+      file.pages.map(page => ({
+        ...page,
+        fileName: file.name,
+        fileId: file.id,
+        totalPages: file.pages.length
+      }))
+    );
+
 
   return (
     <div className="app-container">
@@ -277,6 +345,8 @@ const App = () => {
                       page={page}
                       onRotate={() => rotatePageInFile(page.fileId, page.id)}
                       onRemove={() => removePage(page.fileId, page.id)}
+                      onDragStart={(e) => handlePageDrag(e, page)}
+                      onDrop={(e) => handlePageDrop(e, page)}
                     />
                   ))}
                 </div>

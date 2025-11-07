@@ -620,15 +620,15 @@ body {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 12px;
   }
-  
+
   .header-title {
     font-size: 18px;
   }
-  
+
   .tabs {
     width: 100%;
   }
-  
+
   .tab {
     flex: 1;
     justify-content: center;
@@ -647,7 +647,7 @@ body {
   font-size: 20px;
   font-weight: 500;
   z-index: 2000;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -655,13 +655,43 @@ body {
   animation: fadeInOut 4s ease forwards;
 }
 
-.notification.success { background-color: #5aaf6e; }
-.notification.error { background-color: #dc3545; }
-.notification.info { background-color: #007bff; }
-
-@keyframes fadeInOut {
-  0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-  10%, 90% { opacity: 1; transform: translateX(-50%) translateY(0); }
-  100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+.notification.success {
+  background-color: #5aaf6e;
 }
 
+.notification.error {
+  background-color: #dc3545;
+}
+
+.notification.info {
+  background-color: #007bff;
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+
+  10%,
+  90% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+}
+
+.page-num-label {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
