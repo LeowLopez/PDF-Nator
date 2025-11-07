@@ -7,25 +7,20 @@ import FileCard from './components/FileCard';
 import PageCard from './components/PageCard';
 import StatsBar from './components/StatsBar';
 import Notification from './components/Notification';
-
 import './styles/App.css';
 
-// Carregar PDF.js
-const loadPdfJs = () => {
-  return new Promise((resolve) => {
-    if (window.pdfjsLib) {
-      resolve(window.pdfjsLib);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    script.onload = () => {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      resolve(window.pdfjsLib);
-    };
-    document.head.appendChild(script);
-  });
-};
+// === PDF.js local (via npm install pdfjs-dist) ===
+import * as pdfjsLib from 'pdfjs-dist';
+import { GlobalWorkerOptions } from 'pdfjs-dist';
+
+// Cria e registra o worker local do PDF.js (ESM moderno)
+const pdfWorker = new Worker(
+  new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url),
+  { type: 'module' }
+);
+
+GlobalWorkerOptions.workerPort = pdfWorker;
+
 
 const App = () => {
   const [files, setFiles] = useState([]);
@@ -33,8 +28,6 @@ const App = () => {
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [pdfJs, setPdfJs] = useState(null);
-
   const [notification, setNotification] = useState(null);
 
   const showNotification = (type, message) => {
@@ -44,19 +37,17 @@ const App = () => {
   useEffect(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setIsDarkMode(prefersDark);
-    loadPdfJs().then(lib => setPdfJs(lib));
   }, []);
 
   useEffect(() => {
     document.body.className = isDarkMode ? 'dark-theme' : '';
   }, [isDarkMode]);
 
+  // === Gerar thumbnails de páginas ===
   const generateThumbnail = async (arrayBuffer, pageIndex) => {
-    if (!pdfJs) return null;
-
     try {
       const uint8Array = new Uint8Array(arrayBuffer);
-      const loadingTask = pdfJs.getDocument({ data: uint8Array });
+      const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
       const pdf = await loadingTask.promise;
       const page = await pdf.getPage(pageIndex + 1);
 
@@ -68,11 +59,7 @@ const App = () => {
       canvas.width = viewport.width;
       canvas.height = viewport.height;
 
-      await page.render({
-        canvasContext: context,
-        viewport: viewport
-      }).promise;
-
+      await page.render({ canvasContext: context, viewport }).promise;
       return canvas.toDataURL();
     } catch (error) {
       console.error('Erro ao gerar thumbnail da página', pageIndex + 1, ':', error);
@@ -80,14 +67,10 @@ const App = () => {
     }
   };
 
+  // === Seleção e leitura dos arquivos ===
   const handleFileSelect = async (e) => {
     const selectedFiles = Array.from(e.target.files);
     const pdfFiles = selectedFiles.filter(f => f.type === 'application/pdf');
-
-    if (!pdfJs) {
-      showNotification('info', 'Aguarde, carregando biblioteca PDF...');
-      return;
-    }
 
     setIsProcessing(true);
 
@@ -95,17 +78,13 @@ const App = () => {
       const filesWithPages = await Promise.all(
         pdfFiles.map(async (file) => {
           const arrayBufferOriginal = await file.arrayBuffer();
-
-          // Cria uma cópia do ArrayBuffer para uso pelo pdf-lib
           const arrayBufferForLib = arrayBufferOriginal.slice(0);
           const pdfDoc = await PDFDocument.load(arrayBufferForLib);
           const pageCount = pdfDoc.getPageCount();
 
           const pages = [];
-
-          // Gera thumbnails usando outra cópia para o pdf.js
           for (let i = 0; i < pageCount; i++) {
-            const arrayBufferForPdfJs = arrayBufferOriginal.slice(0); // cópia nova
+            const arrayBufferForPdfJs = arrayBufferOriginal.slice(0);
             const thumbnail = await generateThumbnail(arrayBufferForPdfJs, i);
             pages.push({
               id: Math.random().toString(36).substr(2, 9),
@@ -119,13 +98,14 @@ const App = () => {
             id: Math.random().toString(36).substr(2, 9),
             file,
             name: file.name,
-            arrayBuffer: arrayBufferOriginal, // mantém o original
+            arrayBuffer: arrayBufferOriginal,
             pages
           };
         })
       );
 
       setFiles(prev => [...prev, ...filesWithPages]);
+      showNotification('success', 'PDF(s) carregado(s) com sucesso!');
     } catch (error) {
       showNotification('error', 'Erro ao processar PDFs: ' + error.message);
     } finally {
@@ -133,7 +113,7 @@ const App = () => {
     }
   };
 
-
+  // === Manipulação de páginas ===
   const rotatePageInFile = (fileId, pageId) => {
     setFiles(files.map(file => {
       if (file.id === fileId) {
@@ -180,64 +160,45 @@ const App = () => {
     }).filter(Boolean));
   };
 
+  // === Reordenação de arquivos ===
   const handleDragStart = (index) => setDraggedIndex(index);
-
   const handleDragOver = (e, index) => {
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === index) return;
-
     const newFiles = [...files];
     const draggedFile = newFiles[draggedIndex];
     newFiles.splice(draggedIndex, 1);
     newFiles.splice(index, 0, draggedFile);
-
     setFiles(newFiles);
     setDraggedIndex(index);
   };
-
   const handleDragEnd = () => setDraggedIndex(null);
 
+  // === Mesclar e baixar PDF final ===
   const processPDF = async () => {
     if (files.length === 0) return;
-
     setIsProcessing(true);
-
     try {
       const mergedPdf = await PDFDocument.create();
 
       for (const file of files) {
         const pdfDoc = await PDFDocument.load(file.arrayBuffer);
-
         for (let i = 0; i < file.pages.length; i++) {
           const pageData = file.pages[i];
           const [copiedPage] = await mergedPdf.copyPages(pdfDoc, [pageData.pageNum - 1]);
-
-          if (pageData.rotation !== 0) {
-            copiedPage.setRotation(degrees(pageData.rotation));
-          }
-
+          if (pageData.rotation !== 0) copiedPage.setRotation(degrees(pageData.rotation));
           mergedPdf.addPage(copiedPage);
         }
       }
 
-      const pdfBytes = await mergedPdf.save();
-
-      // === Gerar nome personalizado ===
+      const pdfBytes = await mergedPdf.save({ useObjectStreams: true });
       const now = new Date();
       const pad = (n) => String(n).padStart(2, '0');
-      const timestamp =
-        now.getFullYear().toString() +
-        pad(now.getMonth() + 1) +
-        pad(now.getDate()) + '-' +
-        pad(now.getHours()) +
-        pad(now.getMinutes()) +
-        pad(now.getSeconds());
+      const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
       const filename = `${timestamp} by PDF-Nator.pdf`;
 
       downloadPDF(pdfBytes, filename);
-
       showNotification('success', 'PDF processado com sucesso!');
-
     } catch (error) {
       showNotification('error', 'Erro ao processar PDF: ' + error.message);
     } finally {
@@ -261,7 +222,6 @@ const App = () => {
 
   return (
     <div className="app-container">
-
       {notification && (
         <Notification
           type={notification.type}
@@ -269,7 +229,7 @@ const App = () => {
           onClose={() => setNotification(null)}
         />
       )}
-      
+
       <Header isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
 
       <main className="main-content">
@@ -295,7 +255,6 @@ const App = () => {
         {files.length > 0 && (
           <>
             <StatsBar files={files} />
-
             <div className="files-container">
               {activeTab === 'files' ? (
                 files.map((file, index) => (
@@ -333,7 +292,6 @@ const App = () => {
                 <Download size={20} />
                 {isProcessing ? 'Processando...' : 'Baixar PDF Único'}
               </button>
-
               <button
                 onClick={() => setFiles([])}
                 className="btn btn-secondary"

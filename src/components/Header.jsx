@@ -9,6 +9,7 @@ const Header = ({ isDarkMode, setIsDarkMode }) => (
           <FileUp size={26} color="white" />
         </div>
         <h1 className="header-title">PDF-Nator</h1>
+        <h5 className="header-subtitle"> | Mescle, gire e organize seus PDFs com facilidade</h5>
       </div>
       
       <div className="header-actions">
